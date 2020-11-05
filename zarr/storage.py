@@ -1873,15 +1873,7 @@ class LMDBStore(MutableMapping):
         self.buffers = buffers
         self.path = path
         self.kwargs = kwargs
-        self.write_txn = None
-
-    def __write_opt_enter__(self):
-        self.write_txn = self.db.begin(write=True, buffers=self.buffers)
-        self.write_txn.__enter__()
-
-    def __write_opt_exit__(self):
-        self.write_txn.__exit__()
-        self.write_txn = None
+        self.txn = self.db.begin(write=True)
 
     def __getstate__(self):
         try:
@@ -1911,50 +1903,54 @@ class LMDBStore(MutableMapping):
 
     def __getitem__(self, key):
         key = _dbm_encode_key(key)
+        txn = self.txn
         # use the buffers option, should avoid a memory copy
-        with self.db.begin(buffers=self.buffers) as txn:
-            value = txn.get(key)
+        #with self.db.begin(buffers=self.buffers) as txn:
+        value = txn.get(key)
         if value is None:
             raise KeyError(key)
         return value
 
     def __setitem__(self, key, value):
         key = _dbm_encode_key(key)
-        if self.write_txn == None:
-            with self.db.begin(write=True, buffers=self.buffers) as txn:
-                txn.put(key, value)
-        else:
-            self.write_txn.put(key, value)
+        txn = self.txn
+        #with self.db.begin(write=True, buffers=self.buffers) as txn:
+        txn.put(key, value)
 
     def __delitem__(self, key):
         key = _dbm_encode_key(key)
-        with self.db.begin(write=True) as txn:
-            if not txn.delete(key):
-                raise KeyError(key)
+        txn = self.txn
+        #with self.db.begin(write=True) as txn:
+        if not txn.delete(key):
+            raise KeyError(key)
 
     def __contains__(self, key):
         key = _dbm_encode_key(key)
-        with self.db.begin(buffers=self.buffers) as txn:
-            with txn.cursor() as cursor:
-                return cursor.set_key(key)
+        txn = self.txn
+        #with self.db.begin(buffers=self.buffers) as txn:
+        with txn.cursor() as cursor:
+            return cursor.set_key(key)
 
     def items(self):
-        with self.db.begin(buffers=self.buffers) as txn:
-            with txn.cursor() as cursor:
-                for k, v in cursor.iternext(keys=True, values=True):
-                    yield self.decode_key(k), v
+        #with self.db.begin(buffers=self.buffers) as txn:
+        txn = self.txn
+        with txn.cursor() as cursor:
+            for k, v in cursor.iternext(keys=True, values=True):
+                yield self.decode_key(k), v
 
     def keys(self):
-        with self.db.begin(buffers=self.buffers) as txn:
-            with txn.cursor() as cursor:
-                for k in cursor.iternext(keys=True, values=False):
-                    yield self.decode_key(k)
+        #with self.db.begin(buffers=self.buffers) as txn:
+        txn = self.txn
+        with txn.cursor() as cursor:
+            for k in cursor.iternext(keys=True, values=False):
+                yield self.decode_key(k)
 
     def values(self):
-        with self.db.begin(buffers=self.buffers) as txn:
-            with txn.cursor() as cursor:
-                for v in cursor.iternext(keys=False, values=True):
-                    yield v
+        #with self.db.begin(buffers=self.buffers) as txn:
+        txn = self.txn
+        with txn.cursor() as cursor:
+            for v in cursor.iternext(keys=False, values=True):
+                yield v
 
     def __iter__(self):
         return self.keys()
