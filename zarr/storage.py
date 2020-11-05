@@ -1887,6 +1887,9 @@ class LMDBStore(MutableMapping):
         path, buffers, kwargs = state
         self.__init__(path=path, buffers=buffers, **kwargs)
 
+    def open(self):
+        self.txn = self.db.begin(write=True)
+        
     def close(self):
         """Closes the underlying database."""
         self.db.close()
