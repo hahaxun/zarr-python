@@ -1873,6 +1873,15 @@ class LMDBStore(MutableMapping):
         self.buffers = buffers
         self.path = path
         self.kwargs = kwargs
+        self.write_txn = None
+
+    def __write_opt_enter__(self):
+        self.write_txn = self.db.begin(write=True, buffers=self.buffers)
+        self.write_txn.__enter__()
+
+    def __write_opt_exit__(self):
+        self.write_txn.__exit__()
+        self.write_txn = None
 
     def __getstate__(self):
         try:
@@ -1911,8 +1920,11 @@ class LMDBStore(MutableMapping):
 
     def __setitem__(self, key, value):
         key = _dbm_encode_key(key)
-        with self.db.begin(write=True, buffers=self.buffers) as txn:
-            txn.put(key, value)
+        if self.write_txn == None:
+            with self.db.begin(write=True, buffers=self.buffers) as txn:
+                txn.put(key, value)
+        else:
+            self.write_txn.put(key, value)
 
     def __delitem__(self, key):
         key = _dbm_encode_key(key)
