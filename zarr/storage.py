@@ -363,16 +363,17 @@ def _init_array_metadata(
     object_codec=None,
 ):
 
+    #BUG:this will slow down result, close write check
     # guard conditions
     if overwrite:
         # attempt to delete any pre-existing items in store
         rmdir(store, path)
         if chunk_store is not None:
             rmdir(chunk_store, path)
-    elif contains_array(store, path):
-        raise ContainsArrayError(path)
-    elif contains_group(store, path):
-        raise ContainsGroupError(path)
+    #elif contains_array(store, path):
+    #    raise ContainsArrayError(path)
+    #elif contains_group(store, path):
+    #    raise ContainsGroupError(path)
 
     # normalize metadata
     dtype, object_codec = normalize_dtype(dtype, object_codec)
