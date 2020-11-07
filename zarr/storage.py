@@ -363,17 +363,16 @@ def _init_array_metadata(
     object_codec=None,
 ):
 
-    #BUG:this will slow down result, close write check
     # guard conditions
     if overwrite:
         # attempt to delete any pre-existing items in store
         rmdir(store, path)
         if chunk_store is not None:
             rmdir(chunk_store, path)
-    #elif contains_array(store, path):
-    #    raise ContainsArrayError(path)
-    #elif contains_group(store, path):
-    #    raise ContainsGroupError(path)
+    elif contains_array(store, path):
+        raise ContainsArrayError(path)
+    elif contains_group(store, path):
+        raise ContainsGroupError(path)
 
     # normalize metadata
     dtype, object_codec = normalize_dtype(dtype, object_codec)
@@ -1874,7 +1873,7 @@ class LMDBStore(MutableMapping):
         self.buffers = buffers
         self.path = path
         self.kwargs = kwargs
-        self.txn = self.db.begin(write=True)
+        self.cache_keys = {}
 
     def __getstate__(self):
         try:
@@ -1887,9 +1886,6 @@ class LMDBStore(MutableMapping):
     def __setstate__(self, state):
         path, buffers, kwargs = state
         self.__init__(path=path, buffers=buffers, **kwargs)
-
-    def open(self):
-        self.txn = self.db.begin(write=True)
         
     def close(self):
         """Closes the underlying database."""
@@ -1907,54 +1903,48 @@ class LMDBStore(MutableMapping):
 
     def __getitem__(self, key):
         key = _dbm_encode_key(key)
-        txn = self.txn
         # use the buffers option, should avoid a memory copy
-        #with self.db.begin(buffers=self.buffers) as txn:
-        value = txn.get(key)
-        if value is None:
-            raise KeyError(key)
-        return value
+        with self.db.begin(buffers=self.buffers) as txn:
+            value = txn.get(key)
+            if value is None:
+                raise KeyError(key)
+            return value
 
     def __setitem__(self, key, value):
         key = _dbm_encode_key(key)
-        txn = self.txn
-        #with self.db.begin(write=True, buffers=self.buffers) as txn:
-        txn.put(key, value)
+        self.cache_keys[key] = 0
+        with self.db.begin(write=True, buffers=self.buffers) as txn:
+            txn.put(key, value)
 
     def __delitem__(self, key):
         key = _dbm_encode_key(key)
-        txn = self.txn
-        #with self.db.begin(write=True) as txn:
-        if not txn.delete(key):
-            raise KeyError(key)
+        with self.db.begin(write=True) as txn:
+            if not txn.delete(key):
+                raise KeyError(key)
 
     def __contains__(self, key):
         key = _dbm_encode_key(key)
-        txn = self.txn
-        #with self.db.begin(buffers=self.buffers) as txn:
-        with txn.cursor() as cursor:
-            return cursor.set_key(key)
+        if len(self.cache_keys) == 0:
+            self.cache_keys = dict.fromkeys(self.keys() , 0)
+            yield key in self.cache_keys
 
     def items(self):
-        #with self.db.begin(buffers=self.buffers) as txn:
-        txn = self.txn
-        with txn.cursor() as cursor:
-            for k, v in cursor.iternext(keys=True, values=True):
-                yield self.decode_key(k), v
+        with self.db.begin(buffers=self.buffers) as txn:
+            with txn.cursor() as cursor:
+                for k, v in cursor.iternext(keys=True, values=True):
+                    yield self.decode_key(k), v
 
     def keys(self):
-        #with self.db.begin(buffers=self.buffers) as txn:
-        txn = self.txn
-        with txn.cursor() as cursor:
-            for k in cursor.iternext(keys=True, values=False):
-                yield self.decode_key(k)
+        with self.db.begin(buffers=self.buffers) as txn:
+            with txn.cursor() as cursor:
+                for k in cursor.iternext(keys=True, values=False):
+                    yield self.decode_key(k)
 
     def values(self):
-        #with self.db.begin(buffers=self.buffers) as txn:
-        txn = self.txn
-        with txn.cursor() as cursor:
-            for v in cursor.iternext(keys=False, values=True):
-                yield v
+        with self.db.begin(buffers=self.buffers) as txn:
+            with txn.cursor() as cursor:
+                for v in cursor.iternext(keys=False, values=True):
+                    yield v
 
     def __iter__(self):
         return self.keys()
