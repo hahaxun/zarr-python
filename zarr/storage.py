@@ -1875,7 +1875,6 @@ class LMDBStore(MutableMapping):
         self.buffers = buffers
         self.path = path
         self.kwargs = kwargs
-        self.cache_keys = {}
 
     def __getstate__(self):
         try:
@@ -1913,14 +1912,12 @@ class LMDBStore(MutableMapping):
         return value
 
     def __setitem__(self, key, value):
-        self.cache_keys[key] = 0
         key = _dbm_encode_key(key)
         print(key)
         with self.db.begin(write=True, buffers=self.buffers) as txn:
             txn.put(key, value)
 
     def __delitem__(self, key):
-        self.cache_keys.pop(key, None)
         key = _dbm_encode_key(key)
         with self.db.begin(write=True) as txn:
             if not txn.delete(key):
