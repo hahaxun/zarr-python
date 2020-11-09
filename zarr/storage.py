@@ -366,7 +366,7 @@ def _init_array_metadata(
     # guard conditions
     if overwrite:
         # attempt to delete any pre-existing items in store
-        rmdir(store, path)
+        #rmdir(store, path)
         if chunk_store is not None:
             rmdir(chunk_store, path)
     elif contains_array(store, path):
@@ -481,7 +481,7 @@ def _init_group_metadata(
 ):
 
     # guard conditions
-    if overwrite:
+    '''if overwrite:
         # attempt to delete any pre-existing items in store
         rmdir(store, path)
         if chunk_store is not None:
@@ -490,7 +490,7 @@ def _init_group_metadata(
         raise ContainsArrayError(path)
     elif contains_group(store, path):
         raise ContainsGroupError(path)
-
+    '''
     # initialize metadata
     # N.B., currently no metadata properties are needed, however there may
     # be in future
@@ -1939,13 +1939,15 @@ class LMDBStore(MutableMapping):
                     yield self.decode_key(k), v
 
     def keys(self):
-        if len(self.cache_keys) != 0:
-            return self.cache_keys.keys()
+        #import traceback
+        #traceback.print_stack()
+        #if len(self.cache_keys) != 0:
+        #    return self.cache_keys.keys()
         with self.db.begin(buffers=self.buffers) as txn:
             with txn.cursor() as cursor:
                 for k in cursor.iternext(keys=True, values=False):
-                    self.cache_keys[self.decode_key(k)] = 0
-        return self.cache_keys.keys()
+                    yield self.decode_key(k)
+        #return self.cache_keys.keys()
 
     def values(self):
         with self.db.begin(buffers=self.buffers) as txn:
