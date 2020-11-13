@@ -37,7 +37,7 @@ import time
 
 from numcodecs.compat import ensure_bytes, ensure_contiguous_ndarray
 from numcodecs.registry import codec_registry
-
+from enum import Enum
 from zarr.errors import (
     MetadataError,
     BadCompressorError,
@@ -366,7 +366,7 @@ def _init_array_metadata(
     # guard conditions
     if overwrite:
         # attempt to delete any pre-existing items in store
-        rmdir(store, path)
+        #rmdir(store, path)
         if chunk_store is not None:
             rmdir(chunk_store, path)
     elif contains_array(store, path):
@@ -481,7 +481,7 @@ def _init_group_metadata(
 ):
 
     # guard conditions
-    if overwrite:
+    '''if overwrite:
         # attempt to delete any pre-existing items in store
         rmdir(store, path)
         if chunk_store is not None:
@@ -490,7 +490,7 @@ def _init_group_metadata(
         raise ContainsArrayError(path)
     elif contains_group(store, path):
         raise ContainsGroupError(path)
-
+    '''
     # initialize metadata
     # N.B., currently no metadata properties are needed, however there may
     # be in future
@@ -1113,7 +1113,9 @@ class FSStore(MutableMapping):
             raise ReadOnlyError()
         store_path = self.dir_path(path)
         if self.fs.isdir(store_path):
-            self.fs.rm(store_path, recursive=True)
+            # sometimes doesn't delete on first try with S3
+            while self.fs.exists(store_path):
+                self.fs.rm(store_path, recursive=True)
 
     def getsize(self, path=None):
         store_path = self.dir_path(path)
@@ -1833,7 +1835,7 @@ class LMDBStore(MutableMapping):
 
     def __init__(self, path, buffers=True, **kwargs):
         import lmdb
-
+        
         # set default memory map size to something larger than the lmdb default, which is
         # very likely to be too small for any moderate array (logic copied from zict)
         map_size = (2**40 if sys.maxsize >= 2**32 else 2**28)
@@ -1873,7 +1875,6 @@ class LMDBStore(MutableMapping):
         self.buffers = buffers
         self.path = path
         self.kwargs = kwargs
-        self.cache_keys = {}
 
     def __getstate__(self):
         try:
@@ -1886,7 +1887,7 @@ class LMDBStore(MutableMapping):
     def __setstate__(self, state):
         path, buffers, kwargs = state
         self.__init__(path=path, buffers=buffers, **kwargs)
-        
+
     def close(self):
         """Closes the underlying database."""
         self.db.close()
@@ -1906,13 +1907,13 @@ class LMDBStore(MutableMapping):
         # use the buffers option, should avoid a memory copy
         with self.db.begin(buffers=self.buffers) as txn:
             value = txn.get(key)
-            if value is None:
-                raise KeyError(key)
-            return value
+        if value is None:
+            raise KeyError(key)
+        return value
 
     def __setitem__(self, key, value):
         key = _dbm_encode_key(key)
-        self.cache_keys[key] = 0
+        print(key)
         with self.db.begin(write=True, buffers=self.buffers) as txn:
             txn.put(key, value)
 
@@ -1924,21 +1925,20 @@ class LMDBStore(MutableMapping):
 
     def __contains__(self, key):
         key = _dbm_encode_key(key)
-        if len(self.cache_keys) == 0:
-            self.cache_keys = dict.fromkeys(self.keys() , 0)
-        yield key in self.cache_keys
-
-    def items(self):
         with self.db.begin(buffers=self.buffers) as txn:
             with txn.cursor() as cursor:
                 for k, v in cursor.iternext(keys=True, values=True):
-                    yield self.decode_key(k), v
 
     def keys(self):
+        #import traceback
+        #traceback.print_stack()
+        #if len(self.cache_keys) != 0:
+        #    return self.cache_keys.keys()
         with self.db.begin(buffers=self.buffers) as txn:
             with txn.cursor() as cursor:
                 for k in cursor.iternext(keys=True, values=False):
                     yield self.decode_key(k)
+        #return self.cache_keys.keys()
 
     def values(self):
         with self.db.begin(buffers=self.buffers) as txn:
