@@ -1926,8 +1926,7 @@ class LMDBStore(MutableMapping):
         key = _dbm_encode_key(key)
         if len(self.cache_keys) == 0:
             self.cache_keys = dict.fromkeys(self.keys() , 0)
-            yield key in self.cache_keys
-        return True
+        yield key in self.cache_keys
 
     def items(self):
         with self.db.begin(buffers=self.buffers) as txn:
