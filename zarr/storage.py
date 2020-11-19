@@ -1038,7 +1038,7 @@ class FSStore(MutableMapping):
             key = '/'.join(bits + [end.replace('.', self.key_separator)])
         return key.lower() if self.normalize_keys else key
 
-    def getitems(self, keys):
+    def getitems(self, keys, **kwargs):
         keys = [self._normalize_key(key) for key in keys]
         return self.map.getitems(keys, on_error="omit")
 
@@ -1113,9 +1113,7 @@ class FSStore(MutableMapping):
             raise ReadOnlyError()
         store_path = self.dir_path(path)
         if self.fs.isdir(store_path):
-            # sometimes doesn't delete on first try with S3
-            while self.fs.exists(store_path):
-                self.fs.rm(store_path, recursive=True)
+            self.fs.rm(store_path, recursive=True)
 
     def getsize(self, path=None):
         store_path = self.dir_path(path)

@@ -955,6 +955,11 @@ class TestFSStore(StoreTests, unittest.TestCase):
 
         assert g.data[:].tolist() == [0, 1, 2, 3, 0, 0, 0, 0]
 
+        # test via convenience
+        g = zarr.open("s3://test/out.zarr", mode='r',
+                      storage_options=self.s3so)
+        assert g.data[:].tolist() == [0, 1, 2, 3, 0, 0, 0, 0]
+
     @pytest.mark.usefixtures("s3")
     def test_s3_complex(self):
         import zarr
@@ -1030,7 +1035,8 @@ def s3(request):
             pass
         timeout -= 0.1  # pragma: no cover
         time.sleep(0.1)  # pragma: no cover
-    s3so = dict(client_kwargs={'endpoint_url': endpoint_uri})
+    s3so = dict(client_kwargs={'endpoint_url': endpoint_uri},
+                use_listings_cache=False)
     s3 = s3fs.S3FileSystem(anon=False, **s3so)
     s3.mkdir("test")
     request.cls.s3so = s3so
