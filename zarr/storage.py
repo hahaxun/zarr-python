@@ -1911,7 +1911,6 @@ class LMDBStore(MutableMapping):
 
     def __setitem__(self, key, value):
         key = _dbm_encode_key(key)
-        print(key)
         with self.db.begin(write=True, buffers=self.buffers) as txn:
             txn.put(key, value)
 
