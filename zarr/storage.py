@@ -1924,18 +1924,13 @@ class LMDBStore(MutableMapping):
         key = _dbm_encode_key(key)
         with self.db.begin(buffers=self.buffers) as txn:
             with txn.cursor() as cursor:
-                for k, v in cursor.iternext(keys=True, values=True):
+                return cursor.set_key(key)
 
     def keys(self):
-        #import traceback
-        #traceback.print_stack()
-        #if len(self.cache_keys) != 0:
-        #    return self.cache_keys.keys()
         with self.db.begin(buffers=self.buffers) as txn:
             with txn.cursor() as cursor:
                 for k in cursor.iternext(keys=True, values=False):
                     yield self.decode_key(k)
-        #return self.cache_keys.keys()
 
     def values(self):
         with self.db.begin(buffers=self.buffers) as txn:
